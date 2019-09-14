@@ -37,7 +37,7 @@ macro_rules! ifunc {
 
         static FN: AtomicPtr<()> = AtomicPtr::new(detect as FnRaw);
 
-        fn detect($($needle: u8),+, haystack: &[u8]) -> Option<usize> {
+        fn detect($($needle: u8),+, haystack: *const u8) -> usize {
             let fun =
                 if cfg!(memchr_runtime_avx) && is_x86_feature_detected!("avx2") {
                     avx::$name as FnRaw
@@ -75,31 +75,16 @@ macro_rules! ifunc {
 }
 
 #[inline(always)]
-pub fn memchr(n1: u8, haystack: &[u8]) -> Option<usize> {
-    ifunc!(fn(u8, &[u8]) -> Option<usize>, memchr, haystack, n1)
+pub fn rawmemchr(n1: u8, haystack: *const u8) -> usize {
+    ifunc!(fn(u8, *const u8) -> usize, rawmemchr, haystack, n1)
 }
 
 #[inline(always)]
-pub fn memchr2(n1: u8, n2: u8, haystack: &[u8]) -> Option<usize> {
-    ifunc!(fn(u8, u8, &[u8]) -> Option<usize>, memchr2, haystack, n1, n2)
+pub fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
+    ifunc!(fn(u8, u8, *const u8) -> usize, rawmemchr2, haystack, n1, n2)
 }
 
 #[inline(always)]
-pub fn memchr3(n1: u8, n2: u8, n3: u8, haystack: &[u8]) -> Option<usize> {
-    ifunc!(fn(u8, u8, u8, &[u8]) -> Option<usize>, memchr3, haystack, n1, n2, n3)
-}
-
-#[inline(always)]
-pub fn memrchr(n1: u8, haystack: &[u8]) -> Option<usize> {
-    ifunc!(fn(u8, &[u8]) -> Option<usize>, memrchr, haystack, n1)
-}
-
-#[inline(always)]
-pub fn memrchr2(n1: u8, n2: u8, haystack: &[u8]) -> Option<usize> {
-    ifunc!(fn(u8, u8, &[u8]) -> Option<usize>, memrchr2, haystack, n1, n2)
-}
-
-#[inline(always)]
-pub fn memrchr3(n1: u8, n2: u8, n3: u8, haystack: &[u8]) -> Option<usize> {
-    ifunc!(fn(u8, u8, u8, &[u8]) -> Option<usize>, memrchr3, haystack, n1, n2, n3)
+pub fn rawmemchr3(n1: u8, n2: u8, n3: u8, haystack: *const u8) -> usize {
+    ifunc!(fn(u8, u8, u8, *const u8) -> usize, rawmemchr3, haystack, n1, n2, n3)
 }

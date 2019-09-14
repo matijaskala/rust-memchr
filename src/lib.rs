@@ -37,75 +37,16 @@ extern crate core;
 #[macro_use]
 extern crate quickcheck;
 
-use core::iter::Rev;
-
-pub use iter::{Memchr, Memchr2, Memchr3};
-
 // N.B. If you're looking for the cfg knobs for libc, see build.rs.
 #[cfg(memchr_libc)]
 mod c;
 #[allow(dead_code)]
 mod fallback;
-mod iter;
 mod naive;
 #[cfg(all(target_arch = "x86_64", memchr_runtime_simd))]
 mod x86;
 #[cfg(test)]
 mod tests;
-
-/// An iterator over all occurrences of the needle in a haystack.
-#[inline]
-pub fn memchr_iter(needle: u8, haystack: &[u8]) -> Memchr {
-    Memchr::new(needle, haystack)
-}
-
-/// An iterator over all occurrences of the needles in a haystack.
-#[inline]
-pub fn memchr2_iter(
-    needle1: u8,
-    needle2: u8,
-    haystack: &[u8],
-) -> Memchr2 {
-    Memchr2::new(needle1, needle2, haystack)
-}
-
-/// An iterator over all occurrences of the needles in a haystack.
-#[inline]
-pub fn memchr3_iter(
-    needle1: u8,
-    needle2: u8,
-    needle3: u8,
-    haystack: &[u8],
-) -> Memchr3 {
-    Memchr3::new(needle1, needle2, needle3, haystack)
-}
-
-/// An iterator over all occurrences of the needle in a haystack, in reverse.
-#[inline]
-pub fn memrchr_iter(needle: u8, haystack: &[u8]) -> Rev<Memchr> {
-    Memchr::new(needle, haystack).rev()
-}
-
-/// An iterator over all occurrences of the needles in a haystack, in reverse.
-#[inline]
-pub fn memrchr2_iter(
-    needle1: u8,
-    needle2: u8,
-    haystack: &[u8],
-) -> Rev<Memchr2> {
-    Memchr2::new(needle1, needle2, haystack).rev()
-}
-
-/// An iterator over all occurrences of the needles in a haystack, in reverse.
-#[inline]
-pub fn memrchr3_iter(
-    needle1: u8,
-    needle2: u8,
-    needle3: u8,
-    haystack: &[u8],
-) -> Rev<Memchr3> {
-    Memchr3::new(needle1, needle2, needle3, haystack).rev()
-}
 
 /// Search for the first occurrence of a byte in a slice.
 ///
@@ -128,185 +69,54 @@ pub fn memrchr3_iter(
 /// assert_eq!(memchr(b'k', haystack), Some(8));
 /// ```
 #[inline]
-pub fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
+pub fn rawmemchr(needle: u8, haystack: *const u8) -> usize {
     #[cfg(all(target_arch = "x86_64", memchr_runtime_simd))]
     #[inline(always)]
-    fn imp(n1: u8, haystack: &[u8]) -> Option<usize> {
-        x86::memchr(n1, haystack)
+    fn imp(n1: u8, haystack: *const u8) -> usize {
+        x86::rawmemchr(n1, haystack)
     }
 
-    #[cfg(all(
-        memchr_libc,
-        not(all(target_arch = "x86_64", memchr_runtime_simd))
-    ))]
+    #[cfg(not(all(target_arch = "x86_64", memchr_runtime_simd)))]
     #[inline(always)]
-    fn imp(n1: u8, haystack: &[u8]) -> Option<usize> {
-        c::memchr(n1, haystack)
+    fn imp(n1: u8, haystack: *const u8) -> usize {
+        fallback::rawmemchr(n1, haystack)
     }
 
-    #[cfg(all(
-        not(memchr_libc),
-        not(all(target_arch = "x86_64", memchr_runtime_simd))
-    ))]
-    #[inline(always)]
-    fn imp(n1: u8, haystack: &[u8]) -> Option<usize> {
-        fallback::memchr(n1, haystack)
-    }
-
-    if haystack.is_empty() {
-        None
-    } else {
-        imp(needle, haystack)
-    }
+    imp(needle, haystack)
 }
 
 /// Like `memchr`, but searches for two bytes instead of one.
 #[inline]
-pub fn memchr2(needle1: u8, needle2: u8, haystack: &[u8]) -> Option<usize> {
+pub fn rawmemchr2(needle1: u8, needle2: u8, haystack: *const u8) -> usize {
     #[cfg(all(target_arch = "x86_64", memchr_runtime_simd))]
     #[inline(always)]
-    fn imp(n1: u8, n2: u8, haystack: &[u8]) -> Option<usize> {
-        x86::memchr2(n1, n2, haystack)
+    fn imp(n1: u8, n2: u8, haystack: *const u8) -> usize {
+        x86::rawmemchr2(n1, n2, haystack)
     }
 
     #[cfg(not(all(target_arch = "x86_64", memchr_runtime_simd)))]
     #[inline(always)]
-    fn imp(n1: u8, n2: u8, haystack: &[u8]) -> Option<usize> {
-        fallback::memchr2(n1, n2, haystack)
+    fn imp(n1: u8, n2: u8, haystack: *const u8) -> usize {
+        fallback::rawmemchr2(n1, n2, haystack)
     }
 
-    if haystack.is_empty() {
-        None
-    } else {
-        imp(needle1, needle2, haystack)
-    }
+    imp(needle1, needle2, haystack)
 }
 
 /// Like `memchr`, but searches for three bytes instead of one.
 #[inline]
-pub fn memchr3(
-    needle1: u8,
-    needle2: u8,
-    needle3: u8,
-    haystack: &[u8],
-) -> Option<usize> {
+pub fn rawmemchr3(needle1: u8, needle2: u8, needle3: u8, haystack: *const u8) -> usize {
     #[cfg(all(target_arch = "x86_64", memchr_runtime_simd))]
     #[inline(always)]
-    fn imp(n1: u8, n2: u8, n3: u8, haystack: &[u8]) -> Option<usize> {
-        x86::memchr3(n1, n2, n3, haystack)
+    fn imp(n1: u8, n2: u8, n3: u8, haystack: *const u8) -> usize {
+        x86::rawmemchr3(n1, n2, n3, haystack)
     }
 
     #[cfg(not(all(target_arch = "x86_64", memchr_runtime_simd)))]
     #[inline(always)]
-    fn imp(n1: u8, n2: u8, n3: u8, haystack: &[u8]) -> Option<usize> {
-        fallback::memchr3(n1, n2, n3, haystack)
+    fn imp(n1: u8, n2: u8, n3: u8, haystack: *const u8) -> usize {
+        fallback::rawmemchr3(n1, n2, n3, haystack)
     }
 
-    if haystack.is_empty() {
-        None
-    } else {
-        imp(needle1, needle2, needle3, haystack)
-    }
-}
-
-/// Search for the last occurrence of a byte in a slice.
-///
-/// This returns the index corresponding to the last occurrence of `needle` in
-/// `haystack`, or `None` if one is not found.
-///
-/// While this is operationally the same as something like
-/// `haystack.iter().rposition(|&b| b == needle)`, `memrchr` will use a highly
-/// optimized routine that can be up to an order of magnitude faster in some
-/// cases.
-///
-/// # Example
-///
-/// This shows how to find the last position of a byte in a byte string.
-///
-/// ```
-/// use memchr::memrchr;
-///
-/// let haystack = b"the quick brown fox";
-/// assert_eq!(memrchr(b'o', haystack), Some(17));
-/// ```
-#[inline]
-pub fn memrchr(needle: u8, haystack: &[u8]) -> Option<usize> {
-    #[cfg(all(target_arch = "x86_64", memchr_runtime_simd))]
-    #[inline(always)]
-    fn imp(n1: u8, haystack: &[u8]) -> Option<usize> {
-        x86::memrchr(n1, haystack)
-    }
-
-    #[cfg(all(
-        all(memchr_libc, target_os = "linux"),
-        not(all(target_arch = "x86_64", memchr_runtime_simd))
-    ))]
-    #[inline(always)]
-    fn imp(n1: u8, haystack: &[u8]) -> Option<usize> {
-        c::memrchr(n1, haystack)
-    }
-
-    #[cfg(all(
-        not(all(memchr_libc, target_os = "linux")),
-        not(all(target_arch = "x86_64", memchr_runtime_simd))
-    ))]
-    #[inline(always)]
-    fn imp(n1: u8, haystack: &[u8]) -> Option<usize> {
-        fallback::memrchr(n1, haystack)
-    }
-
-    if haystack.is_empty() {
-        None
-    } else {
-        imp(needle, haystack)
-    }
-}
-
-/// Like `memrchr`, but searches for two bytes instead of one.
-#[inline]
-pub fn memrchr2(needle1: u8, needle2: u8, haystack: &[u8]) -> Option<usize> {
-    #[cfg(all(target_arch = "x86_64", memchr_runtime_simd))]
-    #[inline(always)]
-    fn imp(n1: u8, n2: u8, haystack: &[u8]) -> Option<usize> {
-        x86::memrchr2(n1, n2, haystack)
-    }
-
-    #[cfg(not(all(target_arch = "x86_64", memchr_runtime_simd)))]
-    #[inline(always)]
-    fn imp(n1: u8, n2: u8, haystack: &[u8]) -> Option<usize> {
-        fallback::memrchr2(n1, n2, haystack)
-    }
-
-    if haystack.is_empty() {
-        None
-    } else {
-        imp(needle1, needle2, haystack)
-    }
-}
-
-/// Like `memrchr`, but searches for three bytes instead of one.
-#[inline]
-pub fn memrchr3(
-    needle1: u8,
-    needle2: u8,
-    needle3: u8,
-    haystack: &[u8],
-) -> Option<usize> {
-    #[cfg(all(target_arch = "x86_64", memchr_runtime_simd))]
-    #[inline(always)]
-    fn imp(n1: u8, n2: u8, n3: u8, haystack: &[u8]) -> Option<usize> {
-        x86::memrchr3(n1, n2, n3, haystack)
-    }
-
-    #[cfg(not(all(target_arch = "x86_64", memchr_runtime_simd)))]
-    #[inline(always)]
-    fn imp(n1: u8, n2: u8, n3: u8, haystack: &[u8]) -> Option<usize> {
-        fallback::memrchr3(n1, n2, n3, haystack)
-    }
-
-    if haystack.is_empty() {
-        None
-    } else {
-        imp(needle1, needle2, needle3, haystack)
-    }
+    imp(needle1, needle2, needle3, haystack)
 }
